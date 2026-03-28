@@ -10,6 +10,10 @@ __pycache__/
 # Generated placeholder image (rebuilt at startup)
 templates/no_preview.jpg
 
+# exiftool runtime files (install manually from exiftool.org)
+exiftool.exe
+exiftool_files/
+
 # Editor / OS
 .DS_Store
 Thumbs.db
