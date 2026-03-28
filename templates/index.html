@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Photo Eval{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="num">{{ stats.total_photos }}</div>
+    <div class="label">Photos indexed</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.etsy_yes }}</div>
+    <div class="label">Etsy picks</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.etsy_pending }}</div>
+    <div class="label">Etsy pending</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.instagram_yes }}</div>
+    <div class="label">Instagram picks</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.instagram_pending }}</div>
+    <div class="label">Instagram pending</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.confirmed_listings }}</div>
+    <div class="label">Confirmed for Etsy</div>
+  </div>
+</div>
+
+<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+  <a href="/scan" class="btn btn-primary">Scan folders</a>
+  <a href="/evaluate" class="btn">Start evaluating</a>
+  <a href="/report" class="btn">View report</a>
+  <a href="/listings" class="btn">Listings</a>
+</div>
+
+{% if stats.recent_batches %}
+<h2>Recent sessions</h2>
+<div class="card">
+  <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+    <thead>
+      <tr style="color:var(--muted); text-align:left; border-bottom:1px solid var(--border);">
+        <th style="padding:0.5rem 0.75rem;">Date</th>
+        <th style="padding:0.5rem 0.75rem;">Type</th>
+        <th style="padding:0.5rem 0.75rem;">Folder</th>
+        <th style="padding:0.5rem 0.75rem;">Reviewed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in stats.recent_batches %}
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem 0.75rem; color:var(--muted);">{{ b.session_date }}</td>
+        <td style="padding:0.5rem 0.75rem;">{{ b.eval_type }}</td>
+        <td style="padding:0.5rem 0.75rem; font-family:monospace; font-size:0.82rem;">{{ b.target_folder or "—" }}</td>
+        <td style="padding:0.5rem 0.75rem;">{{ b.images_reviewed }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if stats.total_photos == 0 %}
+<div class="card" style="margin-top:1rem; color:var(--muted); text-align:center; padding:2.5rem;">
+  No photos indexed yet. <a href="/scan" style="color:var(--accent);">Run a scan</a> to get started.
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Evaluate {{ eval_type | capitalize }} — Photo Eval{% endblock %}
+
+{% block extra_style %}
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.photo-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+
+.photo-card.focused { border-color: var(--accent); }
+.photo-card.verdict-yes { border-color: var(--yes-active); }
+.photo-card.verdict-edge { border-color: var(--edge-active); }
+.photo-card.verdict-no { border-color: var(--no-active); }
+
+.photo-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  background: #111;
+}
+
+.photo-card .card-body { padding: 0.6rem; }
+
+.photo-card .fname {
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.photo-card .date { font-size: 0.75rem; color: #555; margin-bottom: 0.5rem; }
+
+.verdict-btns { display: flex; gap: 0.3rem; margin-bottom: 0.4rem; }
+
+.vbtn {
+  flex: 1;
+  padding: 0.3rem 0;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.1s;
+}
+
+.vbtn-yes { background: var(--yes); color: #fff; }
+.vbtn-yes:hover, .vbtn-yes.active { background: var(--yes-active); }
+.vbtn-edge { background: var(--edge); color: #fff; }
+.vbtn-edge:hover, .vbtn-edge.active { background: var(--edge-active); }
+.vbtn-no { background: var(--no); color: #fff; }
+.vbtn-no:hover, .vbtn-no.active { background: var(--no-active); }
+
+.rationale-area {
+  display: none;
+  margin-top: 0.4rem;
+}
+
+.rationale-area textarea {
+  width: 100%;
+  background: #111;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.35rem;
+  font-size: 0.8rem;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.rationale-area select {
+  width: 100%;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.progress-bar-wrap {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+  <h1 style="margin:0;">{{ eval_type | capitalize }} evaluation
+    {% if folder %}<span style="color:var(--muted); font-weight:400; font-size:1rem;"> — {{ folder }}</span>{% endif %}
+  </h1>
+  <span style="color:var(--muted); font-size:0.88rem;">
+    {{ progress.reviewed | default(0) }} reviewed / {{ progress.total | default(0) }} total
+    ({{ progress.remaining | default(0) }} remaining)
+  </span>
+</div>
+
+{% if progress.total > 0 %}
+<div class="progress-bar-wrap">
+  <div class="progress-bar-fill"
+       style="width:{{ ((progress.reviewed / progress.total) * 100) | round(1) }}%"></div>
+</div>
+{% endif %}
+
+{% if just_saved %}
+<p style="color:var(--yes-active); font-size:0.88rem; margin-bottom:0.75rem;">
+  ✓ {{ just_saved }} verdict{{ 's' if just_saved != 1 }} saved.
+</p>
+{% endif %}
+
+{% if not photos %}
+<div class="card" style="text-align:center; padding:2.5rem; color:var(--muted);">
+  <p style="font-size:1.1rem; margin-bottom:0.5rem;">🎉 All done!</p>
+  <p>No more unreviewed photos for <strong>{{ eval_type }}</strong>
+    {% if folder %}in <code>{{ folder }}</code>{% endif %}.</p>
+  <div style="margin-top:1rem; display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+    <a href="/evaluate" class="btn">Evaluate another type</a>
+    <a href="/report" class="btn btn-primary">View report</a>
+  </div>
+</div>
+{% else %}
+
+<form id="verdict-form"
+      hx-post="/evaluate/verdict"
+      hx-target="body"
+      hx-swap="outerHTML"
+      hx-indicator="#submit-spinner">
+  <input type="hidden" name="eval_type" value="{{ eval_type }}">
+  <input type="hidden" name="folder" value="{{ folder }}">
+  <input type="hidden" name="batch_id" value="{{ batch_id }}">
+  {% for p in photos %}
+  <input type="hidden" name="photo_ids" value="{{ p.id }}">
+  {% endfor %}
+
+  <div class="photo-grid" id="photo-grid">
+    {% for p in photos %}
+    <div class="photo-card" id="card-{{ loop.index0 }}" data-index="{{ loop.index0 }}"
+         onclick="focusCard({{ loop.index0 }})">
+      <img src="/preview/{{ p.id }}" alt="{{ p.filename }}" loading="lazy">
+      <div class="card-body">
+        <div class="fname" title="{{ p.filename }}">{{ p.filename }}</div>
+        <div class="date">{{ p.date_taken or p.folder_path }}</div>
+        <div class="verdict-btns">
+          <button type="button" class="vbtn vbtn-yes" id="yes-{{ loop.index0 }}"
+                  onclick="setVerdict(event, {{ loop.index0 }}, 'yes')">YES</button>
+          <button type="button" class="vbtn vbtn-edge" id="edge-{{ loop.index0 }}"
+                  onclick="setVerdict(event, {{ loop.index0 }}, 'edge_case')">EDGE</button>
+          <button type="button" class="vbtn vbtn-no" id="no-{{ loop.index0 }}"
+                  onclick="setVerdict(event, {{ loop.index0 }}, 'no')">NO</button>
+        </div>
+        <input type="hidden" name="verdict_{{ loop.index0 }}" id="verdict-input-{{ loop.index0 }}" value="">
+        <div class="rationale-area" id="rationale-area-{{ loop.index0 }}">
+          <textarea name="rationale_{{ loop.index0 }}"
+                    placeholder="Rationale (required for YES/EDGE)…"></textarea>
+          {% if eval_type == 'etsy' %}
+          <select name="paper_{{ loop.index0 }}">
+            <option value="">— paper —</option>
+            {% for paper in etsy_papers %}
+            <option value="{{ paper }}">{{ paper }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+        <div class="rationale-area" id="reject-area-{{ loop.index0 }}">
+          <input type="text" name="rejection_reason_{{ loop.index0 }}"
+                 placeholder="Rejection reason (optional)…"
+                 style="width:100%; font-size:0.8rem;">
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <button type="submit" class="btn btn-primary" id="submit-btn">
+      Submit batch &amp; load next →
+    </button>
+    <span id="submit-spinner" class="htmx-indicator" style="color:var(--muted);">Loading…</span>
+    <span id="verdict-count" style="color:var(--muted); font-size:0.88rem;"></span>
+  </div>
+</form>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TOTAL = {{ photos | length }};
+let focusedIndex = 0;
+const verdicts = new Array(TOTAL).fill('');
+
+function focusCard(idx) {
+  document.querySelectorAll('.photo-card').forEach(c => c.classList.remove('focused'));
+  const card = document.getElementById('card-' + idx);
+  if (card) {
+    card.classList.add('focused');
+    card.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  }
+  focusedIndex = idx;
+}
+
+function setVerdict(evt, idx, v) {
+  evt && evt.stopPropagation();
+  verdicts[idx] = v;
+
+  // Update hidden input
+  document.getElementById('verdict-input-' + idx).value = v;
+
+  // Update card border class
+  const card = document.getElementById('card-' + idx);
+  card.classList.remove('verdict-yes', 'verdict-edge', 'verdict-no');
+  if (v === 'yes') card.classList.add('verdict-yes');
+  else if (v === 'edge_case') card.classList.add('verdict-edge');
+  else if (v === 'no') card.classList.add('verdict-no');
+
+  // Update button active states
+  ['yes','edge','no'].forEach(k => {
+    const btn = document.getElementById(k + '-' + idx);
+    if (btn) btn.classList.remove('active');
+  });
+  const activeKey = v === 'edge_case' ? 'edge' : v;
+  const activeBtn = document.getElementById(activeKey + '-' + idx);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Show/hide rationale and rejection areas
+  const rationaleArea = document.getElementById('rationale-area-' + idx);
+  const rejectArea = document.getElementById('reject-area-' + idx);
+  rationaleArea.style.display = (v === 'yes' || v === 'edge_case') ? 'block' : 'none';
+  rejectArea.style.display = (v === 'no') ? 'block' : 'none';
+
+  updateVerdictCount();
+
+  // Auto-advance focus
+  if (v === 'no' && idx < TOTAL - 1) focusCard(idx + 1);
+}
+
+function updateVerdictCount() {
+  const done = verdicts.filter(v => v !== '').length;
+  const el = document.getElementById('verdict-count');
+  if (el) el.textContent = done + ' / ' + TOTAL + ' marked';
+}
+
+document.addEventListener('keydown', function(e) {
+  // Don't capture if typing in textarea/input
+  const tag = document.activeElement.tagName.toLowerCase();
+  if (tag === 'textarea' || tag === 'input' || tag === 'select') return;
+
+  const key = e.key;
+
+  // 1-9 and 0 select photo
+  if (/^[1-9]$/.test(key)) { focusCard(parseInt(key) - 1); return; }
+  if (key === '0') { focusCard(9); return; }
+
+  // Arrow keys navigate
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    e.preventDefault();
+    focusCard(Math.min(focusedIndex + 1, TOTAL - 1));
+    return;
+  }
+  if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    e.preventDefault();
+    focusCard(Math.max(focusedIndex - 1, 0));
+    return;
+  }
+
+  // Y/E/N set verdict
+  if (key === 'y' || key === 'Y') { setVerdict(null, focusedIndex, 'yes'); return; }
+  if (key === 'e' || key === 'E') { setVerdict(null, focusedIndex, 'edge_case'); return; }
+  if (key === 'n' || key === 'N') { setVerdict(null, focusedIndex, 'no'); return; }
+
+  // Enter submits
+  if (key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('submit-btn').click();
+    return;
+  }
+});
+
+// Focus first card on load
+document.addEventListener('DOMContentLoaded', () => focusCard(0));
+updateVerdictCount();
+</script>
+{% endblock %}

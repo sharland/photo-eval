@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Listings — Photo Eval{% endblock %}
+
+{% block extra_style %}
+.listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.listing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.listing-card.confirmed { border-color: var(--yes-active); }
+
+.listing-card img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  background: #111;
+  display: block;
+}
+
+.listing-card .lc-body { padding: 0.75rem; }
+.listing-card .fname { font-family: monospace; font-size: 0.8rem; color: var(--muted); }
+.listing-card .rationale { font-size: 0.82rem; margin: 0.4rem 0; color: var(--text); }
+.listing-card .paper { font-size: 0.8rem; color: var(--edge-active); }
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.25rem;">
+  <h1 style="margin:0;">Etsy listings</h1>
+  <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+    {% if collections %}
+    <form method="get" action="/listings" style="display:flex; gap:0.5rem; align-items:center;">
+      <select name="collection" onchange="this.form.submit()" style="font-size:0.85rem;">
+        <option value="">— all collections —</option>
+        {% for c in collections %}
+        <option value="{{ c }}" {% if c == selected_collection %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    <a href="/listings/export{% if selected_collection %}?collection={{ selected_collection }}{% endif %}"
+       class="btn btn-primary" style="font-size:0.88rem;">
+      ↓ Export for Claude Desktop
+    </a>
+  </div>
+</div>
+
+{% if not photos %}
+<div class="card" style="text-align:center; padding:2.5rem; color:var(--muted);">
+  No Etsy YES photos yet. <a href="/evaluate" style="color:var(--accent);">Start evaluating</a>.
+</div>
+{% else %}
+<p style="color:var(--muted); font-size:0.85rem; margin-bottom:1rem;">
+  {{ photos | length }} Etsy-worthy photos.
+  {{ photos | selectattr('is_confirmed') | list | length }} confirmed for listing.
+  Click <strong>Confirm</strong> on photos you're happy with, then export for Claude Desktop to draft copy.
+</p>
+
+<div class="listings-grid">
+  {% for p in photos %}
+  <div class="listing-card {% if p.id in confirmed_ids %}confirmed{% endif %}" id="lc-{{ p.id }}">
+    <img src="/preview/{{ p.id }}" alt="{{ p.filename }}" loading="lazy">
+    <div class="lc-body">
+      <div class="fname">{{ p.filename }}</div>
+      <div style="font-size:0.78rem; color:#555; margin-bottom:0.3rem;">
+        {{ p.date_taken or p.folder_path }}
+      </div>
+      {% if p.paper_recommendation %}
+      <div class="paper">{{ p.paper_recommendation }}</div>
+      {% endif %}
+      {% if p.rationale %}
+      <div class="rationale">{{ p.rationale }}</div>
+      {% endif %}
+      <div style="margin-top:0.6rem; display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+        {% if p.id not in confirmed_ids %}
+        <form style="display:flex; gap:0.4rem; align-items:center;"
+              hx-post="/listings/confirm/{{ p.id }}"
+              hx-target="#lc-status-{{ p.id }}"
+              hx-swap="innerHTML">
+          <input type="text" name="collection" placeholder="Collection (opt.)"
+                 style="width:130px; font-size:0.78rem; padding:0.25rem 0.4rem;"
+                 value="{{ p.collection or '' }}">
+          <button type="submit" class="btn" style="font-size:0.78rem; padding:0.25rem 0.6rem;">
+            Confirm
+          </button>
+        </form>
+        {% else %}
+        <form hx-post="/listings/remove/{{ p.id }}"
+              hx-target="#lc-status-{{ p.id }}"
+              hx-swap="innerHTML">
+          <button type="submit" class="btn" style="font-size:0.78rem; padding:0.25rem 0.6rem; color:var(--muted);">
+            Remove
+          </button>
+        </form>
+        {% endif %}
+        <span id="lc-status-{{ p.id }}" style="font-size:0.8rem;">
+          {% if p.id in confirmed_ids %}<span style="color:var(--yes-active);">✓ Confirmed{% if p.collection %} · {{ p.collection }}{% endif %}</span>{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

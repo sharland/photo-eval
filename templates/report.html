@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Report — Photo Eval{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.25rem;">
+  <h1 style="margin:0;">Report</h1>
+  <form method="get" action="/report" style="display:flex; gap:0.5rem; align-items:center;">
+    <select name="folder" onchange="this.form.submit()" style="font-size:0.85rem;">
+      <option value="">— all folders —</option>
+      {% for root in roots %}
+      <option value="{{ root }}" {% if root == selected_folder %}selected{% endif %}>{{ root }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit" class="btn">Filter</button></noscript>
+  </form>
+</div>
+
+<div class="stat-grid" style="margin-bottom:1.5rem;">
+  <div class="stat-card">
+    <div class="num">{{ stats.total }}</div>
+    <div class="label">Total photos{% if selected_folder %} in {{ selected_folder }}{% endif %}</div>
+  </div>
+  {% for et, s in stats.per_type.items() %}
+  <div class="stat-card">
+    <div class="num" style="font-size:1.4rem;">{{ s.yes }}</div>
+    <div class="label">{{ et | capitalize }} YES</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% for et, s in stats.per_type.items() %}
+<div class="card" style="margin-bottom:1rem;">
+  <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:0.75rem;">
+    <h2 style="color:var(--text); margin:0;">{{ et | capitalize }}</h2>
+    <span style="color:var(--muted); font-size:0.85rem;">hit rate: {{ s.hit_rate }}</span>
+  </div>
+  <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:0.9rem; margin-bottom:0.75rem;">
+    <span style="color:var(--yes-active);">YES: {{ s.yes }}</span>
+    <span style="color:var(--edge-active);">EDGE: {{ s.edge }}</span>
+    <span style="color:var(--no-active);">NO: {{ s.no }}</span>
+    <span style="color:var(--muted);">Reviewed: {{ s.reviewed }}</span>
+    <span style="color:var(--muted);">Pending: {{ s.pending }}</span>
+  </div>
+  {% if s.reviewed > 0 %}
+  <div style="height:8px; background:var(--border); border-radius:4px; overflow:hidden; max-width:400px;">
+    <div style="height:100%; width:{{ ((s.reviewed / stats.total) * 100) | round(1) }}%;
+                background:var(--accent); border-radius:4px;"></div>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if stats.paper_breakdown %}
+<div class="card" style="margin-bottom:1rem;">
+  <h2 style="margin-bottom:0.75rem; color:var(--text);">Etsy paper recommendations</h2>
+  <table style="font-size:0.88rem; border-collapse:collapse;">
+    {% for row in stats.paper_breakdown %}
+    <tr>
+      <td style="padding:0.3rem 0.75rem 0.3rem 0; color:var(--text);">{{ row.paper }}</td>
+      <td style="padding:0.3rem 0; color:var(--muted);">{{ row.cnt }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if pending %}
+<div class="card">
+  <h2 style="margin-bottom:0.75rem; color:var(--text);">Pending Etsy evaluation by folder</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+    <thead>
+      <tr style="color:var(--muted); text-align:left; border-bottom:1px solid var(--border);">
+        <th style="padding:0.4rem 0.75rem;">Root</th>
+        <th style="padding:0.4rem 0.75rem; text-align:right;">Total</th>
+        <th style="padding:0.4rem 0.75rem; text-align:right;">Pending Etsy</th>
+        <th style="padding:0.4rem 0.75rem;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in pending %}
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.4rem 0.75rem; font-family:monospace; font-size:0.82rem;">{{ row.root }}</td>
+        <td style="padding:0.4rem 0.75rem; text-align:right; color:var(--muted);">{{ row.total }}</td>
+        <td style="padding:0.4rem 0.75rem; text-align:right; color:var(--yes-active);">{{ row.pending_etsy }}</td>
+        <td style="padding:0.4rem 0.75rem;">
+          <a href="/evaluate/batch?eval_type=etsy&folder={{ row.root }}"
+             style="color:var(--accent); font-size:0.82rem;">Evaluate →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

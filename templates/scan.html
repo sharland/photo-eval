@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Scan — Photo Eval{% endblock %}
+
+{% block content %}
+<h1>Scan folders</h1>
+
+<div class="card" style="margin-bottom:1.5rem; max-width:500px;">
+  <h2 style="margin-bottom:1rem;">Index a folder</h2>
+  <form hx-post="/scan/start" hx-target="#scan-status" hx-swap="outerHTML"
+        style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+    <select name="root" style="flex:1; min-width:160px;">
+      <option value="">— select root —</option>
+      {% for root in photo_roots %}
+      <option value="{{ root }}">{{ root }}</option>
+      {% endfor %}
+      <option value="all">ALL folders</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Start scan</button>
+  </form>
+  <div id="scan-status" style="margin-top:1rem;"></div>
+</div>
+
+<p style="color:var(--muted); font-size:0.85rem; margin-bottom:1rem;">
+  {{ total_indexed | default(0) }} photos indexed total (excluding personal subfolders).
+  Re-scanning a folder is safe — existing records are not duplicated.
+</p>
+
+{% if folder_stats %}
+<h2>Scanned folders</h2>
+<div class="card">
+  <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+    <thead>
+      <tr style="color:var(--muted); text-align:left; border-bottom:1px solid var(--border);">
+        <th style="padding:0.5rem 0.75rem;">Folder</th>
+        <th style="padding:0.5rem 0.75rem; text-align:right;">Files</th>
+        <th style="padding:0.5rem 0.75rem; text-align:right;">Personal</th>
+        <th style="padding:0.5rem 0.75rem;">Scanned</th>
+        <th style="padding:0.5rem 0.75rem;">Last eval</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in folder_stats %}
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem 0.75rem; font-family:monospace; font-size:0.8rem;">{{ row.folder_path }}</td>
+        <td style="padding:0.5rem 0.75rem; text-align:right;">{{ row.file_count }}</td>
+        <td style="padding:0.5rem 0.75rem; text-align:right; color:var(--muted);">{{ row.personal_count }}</td>
+        <td style="padding:0.5rem 0.75rem; color:var(--muted); font-size:0.8rem;">{{ row.scanned_at[:10] if row.scanned_at else "—" }}</td>
+        <td style="padding:0.5rem 0.75rem; color:var(--muted); font-size:0.8rem;">
+          {% if row.last_evaluated %}{{ row.last_evaluated[:10] }} ({{ row.eval_type_last }}){% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="color:var(--muted); text-align:center; padding:2rem;">
+  No folders scanned yet. Select a root folder above and click Start scan.
+</div>
+{% endif %}
+{% endblock %}
